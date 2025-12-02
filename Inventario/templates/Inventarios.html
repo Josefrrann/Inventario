@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="es" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gestión de Inventario</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+      .table-container {
+        background-color: white;
+        color: #212529; 
+      }
+      .form-control {
+        background-color: #495057; color: #f8f9fa; border-color: #6c757d;
+      }
+      
+      .table-container tbody tr:not(.table-danger):not(.table-warning) {
+        --bs-table-bg: white;
+        --bs-table-color: #212529;
+        --bs-table-striped-bg: #f2f2f2;
+      }
+      
+      .table-container .table-hover tbody tr:not(.table-danger):not(.table-warning):hover {
+        --bs-table-hover-bg: #e9ecef; 
+        --bs-table-hover-color: #212529; 
+      }
+    </style>
+  </head>
+  <body style="background-color: #212529;">
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4" style="background-color: #343a40;">
+      <div class="container">
+        <a class="navbar-brand" href="{% url 'lista_inventario' %}">Gestión de Inventario</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+            {% if user.is_authenticated %}
+              <li class="nav-item">
+                <span class="navbar-text me-2">Hola, {{ user.username }}</span>
+              </li>
+              {% if user.is_superuser %}
+              <li class="nav-item me-2">
+                <a class="btn btn-sm btn-outline-info d-flex align-items-center" href="{% url 'lista_usuarios' %}">
+                  <i class="bi bi-people-fill me-1"></i> Gestionar Usuarios
+                </a>
+              </li>
+              {% endif %}
+              <li class="nav-item">
+                <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-danger" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">Cerrar Sesión</a>
+                <form id="logout-form" action="{% url 'logout' %}" method="POST" style="display: none;">{% csrf_token %}</form>
+              </li>
+            {% else %}
+              <li class="nav-item">
+                <a class="btn btn-outline-primary" href="{% url 'login' %}">Iniciar Sesión</a>
+              </li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mt-4">
+      <div class="d-flex justify-content-between align-items-center mb-3 text-light">
+        <h1>Inventario</h1>
+        <a href="{% url 'anadir_producto' %}" class="btn btn-success d-flex align-items-center">
+          <i class="bi bi-plus-lg me-2"></i>Añadir Producto
+        </a>
+      </div>
+
+      <form method="get">
+        <div class="mb-4">
+          <div class="row mb-4">
+            <div class="col-md-7">
+              <div class="input-group">
+                <input type="text" id="search-input" name="q" class="form-control" placeholder="Buscar por código o descripción..." value="{{ request.GET.q }}" autocomplete="off">
+                <button type="submit" class="btn btn-primary">Buscar</button>
+              </div>
+            </div>
+          </div>
+  
+          <div class="row">
+            <div class="col-md-5 text-light">
+              <label class="form-label ">Filtrar por stock:</label>
+              <div class="d-flex gap-2" role="group" aria-label="Filtro de stock">
+                  {% with current_filter=request.GET.stock_filter|default:'all' %}
+                  <a href="{% url 'lista_inventario' %}" class="btn flex-fill {% if current_filter == 'all' and not request.GET.q %}btn-light{% else %}btn-outline-light{% endif %}">Todos</a>
+                  <a href="?stock_filter=low{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="btn flex-fill btn-warning {% if current_filter == 'low' %}border-2 border-dark{% endif %}">Poco Stock</a>
+                  <a href="?stock_filter=none{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="btn flex-fill btn-danger {% if current_filter == 'none' %}border-2 border-dark{% endif %}">Sin Stock</a>
+                  {% endwith %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+      
+      <div class="table-responsive table-container rounded p-2">
+        <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+          <tr>
+            <th scope="col">Código Producto</th>
+            <th scope="col">Descripción</th>
+            <th scope="col">Existencias</th>
+            <th scope="col">Precio</th>
+            <th scope="col">Suma Total</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="table-group-divider">
+          {% for item in inventarios %}
+            {% if item.existencias == 0 %}
+              <tr class="table-danger">
+            {% elif item.existencias < 2 %}
+              <tr class="table-warning">
+            {% else %}
+              <tr>
+            {% endif %}
+                <td>{{ item.codigo_producto }}</td>
+                <td>{{ item.descripcion }}</td>
+                <td>{{ item.existencias }}</td>
+                <td>${{ item.precio|floatformat:2 }}</td>
+                <td>${{ item.suma|floatformat:2 }}</td>
+                <td>
+                  <div class="d-flex flex-wrap gap-2">
+
+                    <a href="{% url 'editar_producto' item.pk %}" class="btn btn-sm btn-primary">Editar</a>
+                    
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#quantityModal" 
+                            data-action="descontar" data-pk="{{ item.pk }}" data-descripcion="{{ item.descripcion }}" {% if item.existencias == 0 %}disabled{% endif %}>
+                        Descontar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#quantityModal" 
+                            data-action="incrementar" data-pk="{{ item.pk }}" data-descripcion="{{ item.descripcion }}">
+                        Añadir
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                            data-pk="{{ item.pk }}" data-descripcion="{{ item.descripcion }}">
+                        Eliminar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+          {% endfor %}
+        </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal fade" id="quantityModal" tabindex="-1" aria-labelledby="quantityModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="quantityForm" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="modalAction">
+            <div class="modal-header">
+              <h5 class="modal-title" id="quantityModalLabel">Ajustar Cantidad</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>Producto: <strong id="modalProductDescription"></strong></p>
+              <div class="mb-3">
+                <label for="cantidad" class="form-label">Cantidad:</label>
+                <input type="number" class="form-control" id="cantidad" name="cantidad" required min="1" value="1">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="deleteConfirmModalLabel">Confirmar Eliminación</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>¿Estás seguro de que quieres eliminar el producto <strong id="modalProductToDelete"></strong>?</p>
+            <p class="text-danger">Esta acción no se puede deshacer.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <form id="deleteForm" method="post" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger">Sí, Eliminar</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="notificationModalLabel">Notificación</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="notificationModalBody">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer mt-auto py-3 text-center text-white-50">
+      <div class="container">
+        <hr class="border-secondary">
+        <small>
+          <a href="https://example.com">Gestión de Inventario</a> © 2025 by <a href="https://example.com">José Meléndez, Wilfredo Sánchez, Diego Iribarren</a> is licensed under <a href="https://creativecommons.org/licenses/by-nd/4.0/">CC BY-ND 4.0</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
+        </small>
+      </div>
+    </footer>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        {% if messages %}
+          const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
+          const modalBody = document.getElementById('notificationModalBody');
+          modalBody.innerHTML = `{% for message in messages %}<div class="alert alert-{{ message.tags }}">{{ message }}</div>{% endfor %}`;
+          notificationModal.show();
+        {% endif %}
+      });
+
+      const quantityModal = document.getElementById('quantityModal');
+      quantityModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        
+        const action = button.getAttribute('data-action');
+        const pk = button.getAttribute('data-pk');
+        const description = button.getAttribute('data-descripcion');
+        
+        const modalTitle = quantityModal.querySelector('.modal-title');
+        const modalDescription = quantityModal.querySelector('#modalProductDescription');
+        const modalActionInput = quantityModal.querySelector('#modalAction');
+        const form = quantityModal.querySelector('#quantityForm');
+        
+        modalTitle.textContent = (action === 'incrementar' ? 'Añadir a' : 'Descontar de') + ' "' + description + '"';
+        modalDescription.textContent = description;
+        modalActionInput.value = action;
+        form.action = `/ajustar/${pk}/`; 
+      });
+
+      const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+      deleteConfirmModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+
+        const pk = button.getAttribute('data-pk');
+        const description = button.getAttribute('data-descripcion');
+
+        const modalProductToDelete = deleteConfirmModal.querySelector('#modalProductToDelete');
+        const deleteForm = deleteConfirmModal.querySelector('#deleteForm');
+
+        modalProductToDelete.textContent = `"${description}"`;
+        deleteForm.action = `/eliminar/${pk}/`; 
+      });
+    </script>
+  </body>
+</html>

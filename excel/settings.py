@@ -7,9 +7,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-@^gleq)jv@x*6ybecfnupb*tr^@f0$f97a24cb9adsc@0ra3(b')
 
 # DEBUG se controla con una variable de entorno. Será 'False' en producción.
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+# Por defecto, DEBUG es True localmente, a menos que la variable de entorno DEBUG se establezca en 'False'.
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -22,6 +23,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'Inventario.apps.InventarioConfig', 
+    'axes', # Añadir django-axes
 ]
 
 MIDDLEWARE = [
@@ -33,6 +35,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware', # Añadir el middleware de axes
 ]
 
 ROOT_URLCONF = 'excel.urls'
@@ -62,6 +65,12 @@ DATABASES = {
     }
 }
 
+# Añadir el backend de autenticación de Axes
+AUTHENTICATION_BACKENDS = [
+    # AxesBackend debe ser el primero
+    'axes.backends.AxesBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -80,6 +89,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-es'
 
 TIME_ZONE = 'UTC'
 
@@ -118,3 +128,13 @@ EMAIL_HOST_PASSWORD = os.environ.get('RESEND_API_KEY')
 # Por ejemplo: 'noreply@tudominio.com'
 # El correo remitente se toma de una variable de entorno.
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'onboarding@resend.dev')
+
+# --- Configuración de django-axes ---
+# Número de intentos fallidos antes de bloquear al usuario.
+AXES_FAILURE_LIMIT = 5 
+
+# Tiempo que el usuario estará bloqueado (en minutos).
+AXES_COOLOFF_TIME = 15 
+
+# Plantilla a mostrar cuando un usuario es bloqueado.
+AXES_LOCKOUT_TEMPLATE = 'registration/lockout.html'

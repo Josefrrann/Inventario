@@ -12,7 +12,7 @@ def lista_inventario(request):
     query = request.GET.get('q')
     stock_filter = request.GET.get('stock_filter')
 
-    inventarios = Inventario.objects.annotate(suma=F('existencias') * F('precio')).order_by('descripcion')
+    inventarios = Inventario.objects.order_by('descripcion')
 
     if query:
         inventarios = inventarios.filter(
